@@ -1,4 +1,4 @@
-include { ALIGN; VARDICT; NORMALIZACE; ANOTACE; COVERAGE } from "${params.projectDirectory}/modules"
+include { ALIGN; VARDICT; NORMALIZACE; ANOTACE; VCF2TXT;  COVERAGE } from "${params.projectDirectory}/modules"
 
 workflow {
 rawfastq = Channel.fromPath("${params.homeDir}/samplesheet.csv")
@@ -22,5 +22,6 @@ aligned	= ALIGN(rawfastq)
 varcalling = VARDICT(aligned)
 normalizovany = NORMALIZACE(varcalling)
 anotovany = ANOTACE(normalizovany)
+anotovany2 = VCF2TXT(anotovany)
 coverage = COVERAGE(aligned)
 }

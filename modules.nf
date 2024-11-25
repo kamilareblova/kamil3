@@ -37,8 +37,6 @@ process VARDICT {
 process NORMALIZACE {
         tag "NORMALIZACE on $name" 
         publishDir "${params.outDirectory}/${sample.run}/varianty/", mode:'copy'
-        container "staphb/bcftools:1.10.2"
-        container "stephenturner/bgzip:latest"
 
         input: 
         tuple val(name), val(sample), path(vardict)
@@ -48,34 +46,51 @@ process NORMALIZACE {
 
         script:
         """
+        source activate bcftoolsbgziptabix
         echo NORMALIZACE $name
-        bgzip $vardict -o ${name}.vcf.gz
+        bgzip $vardict
         tabix ${name}.vcf.gz
         bcftools norm -m-both -o ${name}.bcf1.vcf.gz ${name}.vcf.gz
-        bcftools norm -f ${params.refindex} -o ${name}.bcf2.vcf ${name}.bcf1.vcf.gz
+        bcftools norm -f ${params.ref}.fa -o ${name}.bcf2.vcf ${name}.bcf1.vcf.gz
         """
 }
 
- process ANOTACE {
+process ANOTACE {
        tag "ANOTACE on $name"
        publishDir "${params.outDirectory}/${sample.run}/varianty/", mode:'copy'
-       container "staphb/bcftools:1.10.2"
  
         input:
         tuple val(name), val(sample), path(normalizovany)
   
         output:
-        tuple val(name), val(sample), path("${name}.bcf2.vcf.hg19_multianno.vcf.gz"), path("${name}.final.txt")
+        tuple val(name), val(sample), path("${name}.bcf2.vcf.hg19_multianno.vcf.gz"), path("${name}.bcf2.vcf.hg19_multianno.vcf.gz.tbi")
 
         script:
         """
+        source activate bcftoolsbgziptabix
         echo ANOTACE $name
 
-        ${params.annovar} -vcfinput $normalizovany /mnt/hdd2/reference/humandb/ -buildver hg19 -protocol refGeneWithVer,ensGene,1000g2015aug_all,1000g2015aug_eur,avsnp150,gnomad_exome,cadd13,clinvar_20220320,popfreq_max_20150413,dbnsfp33a -operation gx,g,f,f,f,f,f,f,f,f -nastring . -otherinfo -polish -xreffile ${params.gene_fullxref.txt} -arg '-splicing 5 -exonicsplicing',,,,,,,,, --remove
+        ${params.annovar} -vcfinput $normalizovany ${params.annovardb}  -buildver hg19 -protocol refGeneWithVer,ensGene,1000g2015aug_all,1000g2015aug_eur,avsnp150,gnomad_exome,clinvar_20220320,popfreq_max_20150413,dbnsfp33a -operation gx,g,f,f,f,f,f,f,f -nastring . -otherinfo -polish -xreffile ${params.gene_fullxref.txt} -arg '-splicing 5 -exonicsplicing',,,,,,,, --remove
         bgzip ${name}.bcf2.vcf.hg19_multianno.vcf
         tabix ${name}.bcf2.vcf.hg19_multianno.vcf.gz
-  
-        ${params.gatk} --java-options "-Xmx4g" VariantsToTable -R ${params.refindex}  --show-filtered  -V ${name}.bcf2.vcf.hg19_multianno.vcf.gz -F CHROM -F POS -F REF -F ALT -GF GT -GF DP -GF VD -GF ALD -GF AF -F Func.refGeneWithVer -F Gene.refGeneWithVer -F GeneDetail.refGeneWithVer -F ExonicFunc.refGeneWithVer -F AAChange.refGeneWithVer -F 1000g2015aug_all -F 1000g2015aug_eur -F avsnp150 -F CADD13_RawScore -F CADD13_PHRED -F CLNSIG -F PopFreqMax -F gnomAD_exome_ALL -F gnomAD_exome_NFE -F SIFT_score -F SIFT_converted_rankscore -F SIFT_pred -F Polyphen2_HDIV_score -F Polyphen2_HDIV_rankscore -F Polyphen2_HDIV_pred -F Polyphen2_HVAR_score -F Polyphen2_HVAR_rankscore -F Polyphen2_HVAR_pred -F Expression-egenetics.refGene --output ${name}.final.txt
+        """
+}
+
+process VCF2TXT {
+       tag "VCF2TXT on $name"
+       publishDir "${params.outDirectory}/${sample.run}/varianty/", mode:'copy'
+
+        input:
+        tuple val(name), val(sample), path("${name}.bcf2.vcf.hg19_multianno.vcf.gz"), path("${name}.bcf2.vcf.hg19_multianno.vcf.gz.tbi")
+
+        output:
+        tuple val(name), val(sample), path("${name}.final.txt")
+
+        script:
+        """
+        echo VCF2TXT $name
+        source activate java 
+        java -jar ${params.gatk36} -T VariantsToTable -R ${params.ref}.fa  --showFiltered  -V ${name}.bcf2.vcf.hg19_multianno.vcf.gz -F CHROM -F POS -F REF -F ALT -GF GT -GF DP -GF VD -GF ALD -GF AF -F Func.refGeneWithVer -F Gene.refGeneWithVer -F GeneDetail.refGeneWithVer -F ExonicFunc.refGeneWithVer -F AAChange.refGeneWithVer -F 1000g2015aug_all -F 1000g2015aug_eur -F avsnp150 -F PopFreqMax -F gnomAD_exome_ALL -F gnomAD_exome_NFE -F SIFT_score -F SIFT_converted_rankscore -F SIFT_pred -F Polyphen2_HDIV_score -F Polyphen2_HDIV_rankscore -F Polyphen2_HDIV_pred -F Polyphen2_HVAR_score -F Polyphen2_HVAR_rankscore -F Polyphen2_HVAR_pred -o ${name}.final.txt
         """
 }
 
