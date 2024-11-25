@@ -104,4 +104,6 @@ dependencies:
   - xz=5.2.6=h166bdaf_0
   - zlib=1.2.13=h166bdaf_4
   - zstd=1.5.2=h3eb15da_6
-prefix: /home/kristina/miniconda3/envs/kamila
+  - r-base=3.6.0=hce969dd_0
+  - r-data.table=1.13.6=r36hcfec24a_0
+
